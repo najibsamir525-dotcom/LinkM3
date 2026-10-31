@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   UploadIntentSchema,
   MagicByteVerifier,
+  MAX_FILE_SIZE_BYTES,
 } from "../../src/storage/upload.validator.js";
 
 describe("File Upload Security & Magic Byte Inspection", () => {
@@ -14,6 +15,17 @@ describe("File Upload Security & Magic Byte Inspection", () => {
 
     const parsed = UploadIntentSchema.safeParse(validIntent);
     expect(parsed.success).toBe(true);
+  });
+
+  it("rejects files exceeding maximum size", () => {
+    const oversizedIntent = {
+      filename: "huge.pdf",
+      mimeType: "application/pdf" as const,
+      sizeBytes: MAX_FILE_SIZE_BYTES + 1,
+    };
+
+    const parsed = UploadIntentSchema.safeParse(oversizedIntent);
+    expect(parsed.success).toBe(false);
   });
 
   it("rejects unsupported file types (e.g. svg, exe, bat)", () => {
@@ -31,8 +43,9 @@ describe("File Upload Security & Magic Byte Inspection", () => {
     const validPdfBuffer = Buffer.from([
       0x25, 0x50, 0x44, 0x46, 0x2d, 0x31, 0x2e, 0x37,
     ]);
-    const isValid = MagicByteVerifier.verify(validPdfBuffer, "application/pdf");
-    expect(isValid).toBe(true);
+    expect(MagicByteVerifier.verify(validPdfBuffer, "application/pdf")).toBe(
+      true,
+    );
   });
 
   it("detects and rejects renamed executable disguised as PDF", () => {
@@ -40,30 +53,31 @@ describe("File Upload Security & Magic Byte Inspection", () => {
     const fakePdfBuffer = Buffer.from([
       0x4d, 0x5a, 0x90, 0x00, 0x03, 0x00, 0x00, 0x00,
     ]);
-    const isValid = MagicByteVerifier.verify(fakePdfBuffer, "application/pdf");
-    expect(isValid).toBe(false);
+    expect(MagicByteVerifier.verify(fakePdfBuffer, "application/pdf")).toBe(
+      false,
+    );
   });
 
   it("verifies genuine PNG magic bytes", () => {
     const validPngBuffer = Buffer.from([
       0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
     ]);
-    const isValid = MagicByteVerifier.verify(validPngBuffer, "image/png");
-    expect(isValid).toBe(true);
+    expect(MagicByteVerifier.verify(validPngBuffer, "image/png")).toBe(true);
   });
 
-  it("verifies genuine JPEG, WebP, and DOCX magic bytes", () => {
-    // JPEG
+  it("verifies genuine JPEG magic bytes", () => {
     const jpegBuf = Buffer.from([0xff, 0xd8, 0xff, 0xe0]);
     expect(MagicByteVerifier.verify(jpegBuf, "image/jpeg")).toBe(true);
+  });
 
-    // WebP
+  it("verifies genuine WebP magic bytes", () => {
     const webpBuf = Buffer.from([
       0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50,
     ]);
     expect(MagicByteVerifier.verify(webpBuf, "image/webp")).toBe(true);
+  });
 
-    // DOCX (Zip archive)
+  it("verifies genuine DOCX magic bytes (PK zip archive)", () => {
     const docxBuf = Buffer.from([0x50, 0x4b, 0x03, 0x04]);
     expect(
       MagicByteVerifier.verify(
@@ -73,10 +87,42 @@ describe("File Upload Security & Magic Byte Inspection", () => {
     ).toBe(true);
   });
 
-  it("handles buffers shorter than 4 bytes and unknown MIME types safely", () => {
+  it("covers DOCX alternate PK signatures (line 89+ branches)", () => {
+    // PK\x05\x06 — end of central directory
+    const pk0506 = Buffer.from([0x50, 0x4b, 0x05, 0x06]);
+    expect(
+      MagicByteVerifier.verify(
+        pk0506,
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ),
+    ).toBe(true);
+
+    // PK\x07\x08 — spanned archive
+    const pk0708 = Buffer.from([0x50, 0x4b, 0x07, 0x08]);
+    expect(
+      MagicByteVerifier.verify(
+        pk0708,
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ),
+    ).toBe(true);
+
+    // Invalid PK variant (should fail)
+    const pkInvalid = Buffer.from([0x50, 0x4b, 0x01, 0x02]);
+    expect(
+      MagicByteVerifier.verify(
+        pkInvalid,
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      ),
+    ).toBe(false);
+  });
+
+  it("handles buffers shorter than 4 bytes safely", () => {
     expect(
       MagicByteVerifier.verify(Buffer.from([0x01]), "application/pdf"),
     ).toBe(false);
+  });
+
+  it("returns false for unknown MIME types", () => {
     expect(
       MagicByteVerifier.verify(
         Buffer.from([0x01, 0x02, 0x03, 0x04]),

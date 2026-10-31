@@ -57,12 +57,22 @@ describe("UC-10: Field-Level Encryption (AES-256-GCM)", () => {
     );
   });
 
-  it("rejects payloads with invalid version prefix or malformed segments", () => {
-    expect(() => EncryptionService.decrypt("v2:1:2:3", masterKeyHex)).toThrow(
+  it("rejects payloads with invalid version prefix", () => {
+    expect(() =>
+      EncryptionService.decrypt("v2:aa:bb:cc", masterKeyHex),
+    ).toThrow("Invalid encrypted payload");
+  });
+
+  it("rejects payloads with wrong number of segments", () => {
+    expect(() => EncryptionService.decrypt("v1:aa:bb", masterKeyHex)).toThrow(
       "Invalid encrypted payload",
     );
-    expect(() => EncryptionService.decrypt("v1:1:2", masterKeyHex)).toThrow(
-      "Invalid encrypted payload",
+  });
+
+  it("rejects payloads with empty segments (line 46 branch)", () => {
+    // Force the destructured values to be empty strings
+    expect(() => EncryptionService.decrypt("v1:::cc", masterKeyHex)).toThrow(
+      "Malformed encrypted payload",
     );
   });
 });

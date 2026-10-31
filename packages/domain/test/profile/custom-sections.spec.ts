@@ -31,8 +31,7 @@ describe("UC-09: Schemaless Custom Sections & Dynamic Field Validation", () => {
     expect(parsed.success).toBe(false);
   });
 
-  it("validates diverse typed values correctly", () => {
-    // Text
+  it("validates text type: accepts strings, rejects non-strings, enforces max length", () => {
     expect(
       CustomFieldValueValidator.validateValue("text", "Software Architect")
         .valid,
@@ -40,35 +39,56 @@ describe("UC-09: Schemaless Custom Sections & Dynamic Field Validation", () => {
     expect(CustomFieldValueValidator.validateValue("text", 12345).valid).toBe(
       false,
     );
+    expect(
+      CustomFieldValueValidator.validateValue("text", "a".repeat(5001)).valid,
+    ).toBe(false);
+  });
 
-    // Date
+  it("validates date type: accepts YYYY-MM-DD, rejects other formats", () => {
     expect(
       CustomFieldValueValidator.validateValue("date", "2026-10-30").valid,
     ).toBe(true);
     expect(
       CustomFieldValueValidator.validateValue("date", "30/10/2026").valid,
     ).toBe(false);
+  });
 
-    // Number
+  it("validates number type: accepts numbers, rejects NaN and strings", () => {
     expect(CustomFieldValueValidator.validateValue("number", 42).valid).toBe(
       true,
+    );
+    expect(CustomFieldValueValidator.validateValue("number", NaN).valid).toBe(
+      false,
     );
     expect(
       CustomFieldValueValidator.validateValue("number", "not-a-number").valid,
     ).toBe(false);
+  });
 
-    // URL
+  it("validates url type: accepts valid URLs, rejects non-string and invalid URLs", () => {
     expect(
       CustomFieldValueValidator.validateValue(
         "url",
         "https://github.com/example",
       ).valid,
     ).toBe(true);
-    expect(CustomFieldValueValidator.validateValue("url", "ftp://").valid).toBe(
+    // Non-string input (line 64 branch: typeof value !== 'string')
+    expect(CustomFieldValueValidator.validateValue("url", 12345).valid).toBe(
       false,
     );
+    expect(CustomFieldValueValidator.validateValue("url", 12345).error).toBe(
+      "Expected URL string",
+    );
+    // Invalid URL string (catch branch)
+    expect(
+      CustomFieldValueValidator.validateValue("url", "not-a-valid-url").valid,
+    ).toBe(false);
+    expect(
+      CustomFieldValueValidator.validateValue("url", "not-a-valid-url").error,
+    ).toBe("Invalid URL format");
+  });
 
-    // File
+  it("validates file type: accepts valid UUIDs, rejects non-UUIDs", () => {
     expect(
       CustomFieldValueValidator.validateValue(
         "file",
@@ -78,8 +98,9 @@ describe("UC-09: Schemaless Custom Sections & Dynamic Field Validation", () => {
     expect(
       CustomFieldValueValidator.validateValue("file", "non-uuid-file").valid,
     ).toBe(false);
+  });
 
-    // List
+  it("validates list type: accepts string arrays, rejects non-arrays and mixed types", () => {
     expect(
       CustomFieldValueValidator.validateValue("list", [
         "Node.js",
@@ -87,22 +108,29 @@ describe("UC-09: Schemaless Custom Sections & Dynamic Field Validation", () => {
         "Valkey",
       ]).valid,
     ).toBe(true);
+    // Non-array input (line 85 branch: !Array.isArray(value))
+    expect(
+      CustomFieldValueValidator.validateValue("list", "not-an-array").valid,
+    ).toBe(false);
+    expect(
+      CustomFieldValueValidator.validateValue("list", "not-an-array").error,
+    ).toBe("Expected array of strings");
+    // Array with non-string items
     expect(
       CustomFieldValueValidator.validateValue("list", [1, 2, 3]).valid,
     ).toBe(false);
+  });
 
-    // Null and undefined
+  it("handles null and undefined values gracefully", () => {
     expect(CustomFieldValueValidator.validateValue("text", null).valid).toBe(
       true,
     );
     expect(
       CustomFieldValueValidator.validateValue("text", undefined).valid,
     ).toBe(true);
+  });
 
-    // Length and error bounds
-    expect(
-      CustomFieldValueValidator.validateValue("text", "a".repeat(5001)).valid,
-    ).toBe(false);
+  it("rejects unknown field types (default branch)", () => {
     expect(
       CustomFieldValueValidator.validateValue("unknown" as any, "sample").valid,
     ).toBe(false);

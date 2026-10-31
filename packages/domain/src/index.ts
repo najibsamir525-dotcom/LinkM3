@@ -1,5 +1,6 @@
 export * from "./auth/signup.schema.js";
 export * from "./auth/password.hasher.js";
+export * from "./auth/password.policy.js";
 export * from "./crypto/encryption.service.js";
 export * from "./compliance/consent.schema.js";
 export * from "./profile/profile.schema.js";
