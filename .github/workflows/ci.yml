@@ -14,6 +14,39 @@ jobs:
   quality-gate:
     name: Lint, Typecheck, Test, Audit & Secret Scan
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: linkme
+          POSTGRES_PASSWORD: linkme_password
+          POSTGRES_DB: linkme_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      valkey:
+        image: valkey/valkey:7.2-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "valkey-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: "postgres://linkme:linkme_password@localhost:5432/linkme_test"
+      VALKEY_URL: "redis://localhost:6379"
+      ENCRYPTION_MASTER_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+      BETTER_AUTH_SECRET: "linkme-ci-test-secret-at-least-32-chars-long-12345"
+      APP_URL: "http://localhost:3000"
+
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
@@ -31,6 +64,9 @@ jobs:
 
       - name: Format Check (Prettier)
         run: npm run format:check
+
+      - name: Build Packages (Declarations & Artifacts)
+        run: npm run build
 
       - name: TypeScript Strict Typecheck
         run: npm run typecheck

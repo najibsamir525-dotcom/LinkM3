@@ -1,0 +1,9 @@
+[allowlist]
+description = "Allowlist for test fixtures, mocks, and documentation examples"
+paths = [
+  '''apps/api/test/.*''',
+  '''packages/db/test/.*''',
+  '''packages/domain/test/.*''',
+  '''docs/.*''',
+  '''\.env\.example''',
+]

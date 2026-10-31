@@ -12,16 +12,58 @@
 
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { PGlite } from "@electric-sql/pglite";
+import postgres from "postgres";
 import * as fs from "node:fs";
 import * as path from "node:path";
 
+interface DbClient {
+  exec(sqlText: string): Promise<void>;
+  query<T = unknown>(sqlText: string): Promise<{ rows: T[] }>;
+  close(): Promise<void>;
+}
+
 describe("Real PostgreSQL 16 Engine: Migrations & Constraint Enforcement", () => {
-  let pg: PGlite;
+  let pg: DbClient;
   let initSql: string;
   let downSql: string;
 
   beforeAll(async () => {
-    pg = new PGlite();
+    const dbUrl = process.env["DATABASE_URL"];
+    if (dbUrl) {
+      console.log(
+        "🔗 Testing against REAL PostgreSQL 16 server container:",
+        dbUrl,
+      );
+      const sql = postgres(dbUrl, { max: 1 });
+      pg = {
+        exec: async (sqlText: string) => {
+          await sql.unsafe(sqlText);
+        },
+        query: async <T = unknown>(sqlText: string) => {
+          const res = await sql.unsafe(sqlText);
+          return { rows: Array.from(res) as unknown as T[] };
+        },
+        close: async () => {
+          await sql.end();
+        },
+      };
+    } else {
+      console.log(
+        "⚡ Testing against in-process real PostgreSQL 16 engine (PGlite)",
+      );
+      const pglite = new PGlite();
+      pg = {
+        exec: async (sqlText: string) => {
+          await pglite.exec(sqlText);
+        },
+        query: async <T = unknown>(sqlText: string) => {
+          return await pglite.query<T>(sqlText);
+        },
+        close: async () => {
+          await pglite.close();
+        },
+      };
+    }
 
     const initPath = path.resolve(__dirname, "../drizzle/0000_init.sql");
     const downPath = path.resolve(__dirname, "../drizzle/0000_init_down.sql");
