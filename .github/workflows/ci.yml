@@ -137,7 +137,7 @@ jobs:
           PORT: 4000
           NODE_ENV: "production"
         run: |
-          node apps/api/dist/src/main.js &
+          node apps/api/dist/main.js &
           API_PID=$!
           echo "API spawned with PID: $API_PID"
 
