@@ -177,6 +177,9 @@ jobs:
           echo "Signup HTTP Code: $SIGNUP_HTTP"
           [ "$SIGNUP_HTTP" -eq 200 ]
 
+          echo "4b. Verify Email in Database"
+          docker compose exec -T postgres psql -U linkme_user -d linkme_db -c "UPDATE \"user\" SET email_verified = true WHERE email = 'smoke.tester@linkme.cv';"
+
           echo "5. Login via Better Auth (/api/auth/sign-in/email)"
           SIGNIN_HTTP=$(curl -s -o /tmp/signin_resp.json -w "%{http_code}" -X POST http://localhost:4000/api/auth/sign-in/email \
             -H "Content-Type: application/json" \
