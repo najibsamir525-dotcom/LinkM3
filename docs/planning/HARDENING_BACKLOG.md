@@ -7,6 +7,7 @@
 ---
 
 ## 1. Live Smoke Test: Real Email Verification Flow via Mailpit
+
 - **Current State:** The CI smoke test updates `email_verified = true` via `psql` shortcut to enable login.
 - **Required Action:** Replace the direct SQL update with the real end-to-end verification flow:
   1. Trigger signup via `/api/auth/sign-up/email`.
@@ -18,6 +19,7 @@
 ---
 
 ## 2. Live-Stack Security Rejection Tests
+
 - **Current State:** Age gate, terms acceptance, and NIST password validations are tested in unit and in-process suites.
 - **Required Action:** Extend the live-stack smoke test (`docker-compose-smoke`) to execute real HTTP rejection requests:
   - `POST /api/auth/sign-up/email` without `ageConfirmed: true` $\rightarrow$ Assert `400 Bad Request`.
@@ -29,6 +31,7 @@
 ---
 
 ## 3. Branch Coverage Completion
+
 - **`account-erasure.service.ts` (Line 132):**
   - Cover the catch branch during audit log anonymization when database query rejects.
   - Bring branches from 84.61% to 100%.
@@ -38,6 +41,7 @@
 ---
 
 ## 4. Real CSRF Cookie-Based Rejection & Cookie Hardening
+
 - **Required Action:**
   - Implement a dedicated test verifying that a cross-origin state-changing `POST` request originating from an untrusted site (`Origin: https://evil.com`), even when accompanied by a valid session cookie, is rejected by Fastify CSRF / CORS origin validation.
   - Document and enforce cookie security attributes:
@@ -49,6 +53,7 @@
 ---
 
 ## 5. Test Matrix Disambiguation & Verified Totals
+
 - **Mathematical Reconciliation (191 Tests Monorepo Total):**
   - **`@linkme/db` (63 Tests):**
     - 15 Real Server Engine Tests: 13 in `postgres-real-engine.spec.ts` (connecting to real PostgreSQL 16 container when `DATABASE_URL` is set, or in-process PGlite when unset) + 2 in `valkey-real-engine.spec.ts` (connecting via TCP socket to Valkey 7.2 container when `VALKEY_URL` is set).

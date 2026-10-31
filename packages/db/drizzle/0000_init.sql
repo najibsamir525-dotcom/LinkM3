@@ -323,6 +323,7 @@ CREATE TABLE "resumes" (
 	"direction" "direction_type" DEFAULT 'ltr' NOT NULL,
 	"style_settings" jsonb DEFAULT '{"fontFamily":"Inter","fontSize":10,"primaryColor":"#111827","lineSpacing":1.4,"margins":20}'::jsonb NOT NULL,
 	"is_archived" boolean DEFAULT false NOT NULL,
+	"version" integer DEFAULT 1 NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );

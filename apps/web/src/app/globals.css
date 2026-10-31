@@ -1,0 +1,41 @@
+:root {
+  --bg-color: #f8fafc;
+  --text-color: #0f172a;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Accessible Minimum Touch Target of 24px */
+button, input, select, textarea, [role="button"] {
+  min-height: 24px;
+  min-width: 24px;
+  box-sizing: border-box;
+}
+
+/* Native Print Stylesheet Fallback */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .linkme-resume-sheet,
+  .linkme-resume-sheet * {
+    visibility: visible;
+  }
+  .linkme-resume-sheet {
+    position: absolute;
+    left: 0;
+    top: 0;
+    margin: 0 !important;
+    box-shadow: none !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+}

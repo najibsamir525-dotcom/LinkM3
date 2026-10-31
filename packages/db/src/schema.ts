@@ -602,6 +602,7 @@ export const resumes = pgTable(
         margins: 20,
       }),
     isArchived: boolean("is_archived").notNull().default(false),
+    version: integer("version").notNull().default(1),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),

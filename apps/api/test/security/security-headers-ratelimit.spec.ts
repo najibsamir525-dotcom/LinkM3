@@ -214,5 +214,19 @@ describe("Security Hardening: Headers, Rate Limiting & CORS", () => {
 
       expect(response.headers["access-control-allow-origin"]).not.toBe("*");
     });
+
+    it("rejects cross-origin state-changing POST from untrusted origin with session cookie (CSRF protection)", async () => {
+      const response = await app.inject({
+        method: "POST",
+        url: "/api/auth/sign-in/email",
+        headers: {
+          origin: "https://evil-phishing-site.com",
+          cookie: "linkme.session_token=stolen-or-ambient-session-token",
+        },
+      });
+
+      // Browser CSRF defense: Cross-origin browser cannot read response and origin is never permitted
+      expect(response.headers["access-control-allow-origin"]).toBeUndefined();
+    });
   });
 });

@@ -9,6 +9,7 @@ import { APP_GUARD } from "@nestjs/core";
 import { HealthModule } from "./health/health.module.js";
 import { AuthModule } from "./auth/auth.module.js";
 import { ProfileModule } from "./profile/profile.module.js";
+import { ResumesModule } from "./resumes/resumes.module.js";
 import { DatabaseModule } from "./database.module.js";
 
 @Module({
@@ -48,6 +49,7 @@ import { DatabaseModule } from "./database.module.js";
     HealthModule,
     AuthModule,
     ProfileModule,
+    ResumesModule,
   ],
   providers: [
     // Apply rate limiting globally

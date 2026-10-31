@@ -12,7 +12,13 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { PGlite } from "@electric-sql/pglite";
 import { drizzle } from "drizzle-orm/pglite";
-import { createBetterAuth } from "../../src/auth/better-auth.config.js";
+import {
+  createBetterAuth,
+  baSession,
+  baAccount,
+  baTwoFactor,
+  baUser,
+} from "../../src/auth/better-auth.config.js";
 import { consentRecords, type Database } from "@linkme/db";
 import { eq } from "drizzle-orm";
 
@@ -232,6 +238,26 @@ describe("Better Auth Internal Compliance Hooks", () => {
           },
         }),
       ).rejects.toThrow();
+    });
+
+    it("covers table schema reference callbacks (lines 58, 67, 97) and custom options", () => {
+      const customAuth = createBetterAuth(db, {
+        baseURL: "https://app.linkme.cv",
+        secret: "custom-secret-key-at-least-32-characters-long",
+      });
+      expect(customAuth).toBeDefined();
+
+      const fkSymbol = Object.getOwnPropertySymbols(baSession).find((s) =>
+        s.toString().includes("PgInlineForeignKeys"),
+      )!;
+      const refSession = (baSession as any)[fkSymbol][0].reference();
+      const refAccount = (baAccount as any)[fkSymbol][0].reference();
+      const refTwoFactor = (baTwoFactor as any)[fkSymbol][0].reference();
+      expect(refSession.foreignTable[Symbol.for("drizzle:Name")]).toBe("user");
+      expect(refAccount.foreignTable[Symbol.for("drizzle:Name")]).toBe("user");
+      expect(refTwoFactor.foreignTable[Symbol.for("drizzle:Name")]).toBe(
+        "user",
+      );
     });
   });
 });

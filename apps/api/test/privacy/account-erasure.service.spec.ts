@@ -22,6 +22,8 @@ describe("AccountErasureService (Resilience & Error Handling)", () => {
     const service = new AccountErasureService(mockDb);
     const count = await service.deleteObjects([]);
     expect(count).toBe(0);
+    const countWithKeys = await service.deleteObjects(["profile/photo.webp"]);
+    expect(countWithKeys).toBe(1);
   });
 
   it("handles database exceptions during payments, users, and sessions deletion gracefully", async () => {
@@ -56,6 +58,28 @@ describe("AccountErasureService (Resilience & Error Handling)", () => {
     // Test invalidateUserSessions fallback on line 209
     const sessionsPurged = await service.invalidateUserSessions("usr_fail_123");
     expect(sessionsPurged).toBe(0);
+  });
+
+  it("covers table drop/execute rejection fallback in cascading purge (line 132)", async () => {
+    const mockDb = {
+      execute: vi.fn().mockRejectedValue(new Error("Table execution failed")),
+      update: vi.fn().mockReturnValue({
+        set: vi.fn().mockReturnValue({
+          where: vi.fn().mockResolvedValue({ rowCount: 0 }),
+        }),
+      }),
+      delete: vi.fn().mockReturnValue({
+        where: vi.fn().mockReturnValue({
+          returning: vi.fn().mockResolvedValue([]),
+        }),
+      }),
+    } as unknown as Database;
+
+    const service = new AccountErasureService(mockDb);
+    const res = await service.purgeUserCascading("usr_fail_456");
+    expect(res.tableCounts.length).toBeGreaterThan(0);
+    // Every table should fall back to 0 deleted rows on execute error
+    expect(res.tableCounts[0].rowsDeleted).toBe(0);
   });
 
   it("includes 30-day backup retention notice and SHA-256 digest in final erasure result", async () => {
