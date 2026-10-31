@@ -77,6 +77,14 @@ jobs:
       - name: NPM Security Audit
         run: npm audit --audit-level=high
 
+      - name: Docker Compose Smoke Test
+        run: |
+          docker compose config
+          docker compose up -d postgres valkey mailpit
+          sleep 5
+          docker compose ps
+          docker compose down
+
       - name: Secret Scanning (Gitleaks)
         uses: gitleaks/gitleaks-action@v2
         env:

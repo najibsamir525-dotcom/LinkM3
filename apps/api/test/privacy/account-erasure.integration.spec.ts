@@ -232,4 +232,33 @@ describe("Account Erasure Service — Real PostgreSQL 16 Integration", () => {
     expect(retryReport.reportDigest).toBeDefined();
     expect(retryReport.reportDigest).toHaveLength(64);
   });
+
+  it("handles partial failure when a sub-adapter throws, reporting PARTIAL_FAILURE with error details", async () => {
+    // Mock deleteObjects to throw an exception
+    const originalDelete = erasureService.deleteObjects.bind(erasureService);
+    erasureService.deleteObjects = async () => {
+      throw new Error("S3 500 Internal Error: Connection timeout");
+    };
+
+    // Seed a user with an asset
+    const partialUserId = "88888888-8888-4888-a888-888888888888";
+    await pg.exec(`
+      INSERT INTO users (id, email, age_confirmed, age_confirmed_at, age_policy_version, role, status)
+      VALUES ('${partialUserId}', 'partial@linkme.cv', true, NOW(), 'v1.0', 'USER', 'ACTIVE');
+
+      INSERT INTO media_assets (id, user_id, storage_key, original_filename, mime_type, size_bytes, sha256_hash)
+      VALUES (gen_random_uuid(), '${partialUserId}', 'users/${partialUserId}/avatar.jpg', 'avatar.jpg', 'image/jpeg', 1024, 'dummy_hash');
+    `);
+
+    const partialReport = await erasureService.eraseAccount(partialUserId);
+
+    expect(partialReport.status).toBe("PARTIAL_FAILURE");
+    expect(partialReport.errors).toBeDefined();
+    expect(partialReport.errors![0]).toContain("Storage purge failed: S3 500 Internal Error");
+
+    // Restore original deleteObjects and retry
+    erasureService.deleteObjects = originalDelete;
+    const retryReport = await erasureService.eraseAccount(partialUserId);
+    expect(retryReport.status).toBe("COMPLETED");
+  });
 });

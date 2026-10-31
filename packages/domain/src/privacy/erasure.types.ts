@@ -20,6 +20,7 @@ export interface ErasureReport {
   sessionsInvalidated: number;
   auditLogsAnonymized: number;
   taxRecordsTombstoned: number;
+  errors?: string[];
 }
 
 export interface StoragePurgeAdapter {
@@ -53,38 +54,74 @@ export class AccountErasureOrchestrator {
    * 3. Purges objects from object storage (S3/R2)
    * 4. Cascades hard deletes in PostgreSQL + anonymizes audit logs + tombstones tax records
    * 5. Returns a cryptographically verifiable Erasure Report
+   *
+   * If any step fails, errors are captured, status is set to PARTIAL_FAILURE,
+   * and the report is returned so the job is safely retryable.
    */
   async executeErasure(userId: string): Promise<ErasureReport> {
     const requestedAt = new Date();
+    const errors: string[] = [];
 
     // 1. Identify storage assets to delete before DB cascade removes foreign keys
-    const assetKeys = await this.dbAdapter.getUserAssetStorageKeys(userId);
+    let assetKeys: string[] = [];
+    try {
+      assetKeys = await this.dbAdapter.getUserAssetStorageKeys(userId);
+    } catch (err: unknown) {
+      errors.push(`Failed to retrieve storage keys: ${(err as Error).message}`);
+    }
 
     // 2. Invalidate active sessions immediately in cache
-    const sessionsInvalidated =
-      await this.cacheAdapter.invalidateUserSessions(userId);
+    let sessionsInvalidated = 0;
+    try {
+      sessionsInvalidated =
+        await this.cacheAdapter.invalidateUserSessions(userId);
+    } catch (err: unknown) {
+      errors.push(`Failed to invalidate sessions: ${(err as Error).message}`);
+    }
 
     // 3. Purge storage objects
-    const storageObjectsPurged =
-      assetKeys.length > 0
-        ? await this.storageAdapter.deleteObjects(assetKeys)
-        : 0;
+    let storageObjectsPurged = 0;
+    if (assetKeys.length > 0) {
+      try {
+        storageObjectsPurged = await this.storageAdapter.deleteObjects(assetKeys);
+      } catch (err: unknown) {
+        errors.push(`Storage purge failed: ${(err as Error).message}`);
+      }
+    }
 
     // 4. Cascade DB purge & audit log scrub
-    const dbPurgeResult = await this.dbAdapter.purgeUserCascading(userId);
+    let dbRecordsPurged: TableDeletionCount[] = [];
+    let auditLogsAnonymized = 0;
+    let taxRecordsTombstoned = 0;
+
+    try {
+      const dbPurgeResult = await this.dbAdapter.purgeUserCascading(userId);
+      dbRecordsPurged = dbPurgeResult.tableCounts;
+      auditLogsAnonymized = dbPurgeResult.auditLogsAnonymized;
+      taxRecordsTombstoned = dbPurgeResult.taxRecordsTombstoned;
+    } catch (err: unknown) {
+      errors.push(`Database cascade purge failed: ${(err as Error).message}`);
+    }
 
     const completedAt = new Date();
+    const status = errors.length > 0 ? "PARTIAL_FAILURE" : "COMPLETED";
 
-    return {
+    const report: ErasureReport = {
       userId,
       requestedAt,
       completedAt,
-      status: "COMPLETED",
-      dbRecordsPurged: dbPurgeResult.tableCounts,
+      status,
+      dbRecordsPurged,
       storageObjectsPurged,
       sessionsInvalidated,
-      auditLogsAnonymized: dbPurgeResult.auditLogsAnonymized,
-      taxRecordsTombstoned: dbPurgeResult.taxRecordsTombstoned,
+      auditLogsAnonymized,
+      taxRecordsTombstoned,
     };
+
+    if (errors.length > 0) {
+      report.errors = errors;
+    }
+
+    return report;
   }
 }
