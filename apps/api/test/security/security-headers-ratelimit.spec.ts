@@ -161,10 +161,10 @@ describe("Security Hardening: Headers, Rate Limiting & CORS", () => {
         responses.push(res.statusCode);
       }
 
-      // First 3 should pass through throttler (returning 400 Bad Request due to validation)
-      expect(responses[0]).toBe(400);
-      expect(responses[1]).toBe(400);
-      expect(responses[2]).toBe(400);
+      // First 3 should pass through throttler (returning 410 Gone because direct signup is retired)
+      expect(responses[0]).toBe(410);
+      expect(responses[1]).toBe(410);
+      expect(responses[2]).toBe(410);
 
       // 4th and 5th requests should be blocked by Throttler with 429
       expect(responses[3]).toBe(429);
@@ -172,7 +172,7 @@ describe("Security Hardening: Headers, Rate Limiting & CORS", () => {
     });
   });
 
-  describe("CORS & Origin Validation", () => {
+  describe("CORS, CSRF & Origin Validation", () => {
     it("returns CORS headers for allowed origin", async () => {
       const response = await app.inject({
         method: "OPTIONS",
@@ -189,7 +189,7 @@ describe("Security Hardening: Headers, Rate Limiting & CORS", () => {
       expect(response.headers["access-control-allow-credentials"]).toBe("true");
     });
 
-    it("does not allow untrusted origins", async () => {
+    it("does not allow untrusted origins (prevents cross-origin CSRF)", async () => {
       const response = await app.inject({
         method: "OPTIONS",
         url: "/api/auth/signup",
@@ -200,6 +200,19 @@ describe("Security Hardening: Headers, Rate Limiting & CORS", () => {
       });
 
       expect(response.headers["access-control-allow-origin"]).toBeUndefined();
+    });
+
+    it("prohibits wildcard Access-Control-Allow-Origin header when credentials are true", async () => {
+      const response = await app.inject({
+        method: "OPTIONS",
+        url: "/health/live",
+        headers: {
+          origin: "https://linkme.cv",
+          "access-control-request-method": "GET",
+        },
+      });
+
+      expect(response.headers["access-control-allow-origin"]).not.toBe("*");
     });
   });
 });

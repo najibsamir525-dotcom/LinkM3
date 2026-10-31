@@ -9,12 +9,12 @@ import {
   Controller,
   Post,
   Delete,
-  Body,
   Req,
   HttpCode,
   HttpStatus,
+  GoneException,
 } from "@nestjs/common";
-import { ApiTags, ApiOperation, ApiResponse, ApiBody } from "@nestjs/swagger";
+import { ApiTags, ApiOperation, ApiResponse } from "@nestjs/swagger";
 import { Throttle } from "@nestjs/throttler";
 import { AuthService } from "./auth.service.js";
 import type { FastifyRequest } from "fastify";
@@ -25,65 +25,27 @@ export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post("signup")
-  @HttpCode(HttpStatus.CREATED)
+  @HttpCode(HttpStatus.GONE)
   @Throttle({
     short: { limit: 3, ttl: 1000 },
     medium: { limit: 5, ttl: 60000 },
   })
   @ApiOperation({
-    summary: "Register a new user account",
+    summary: "Decommissioned legacy signup endpoint",
     description:
-      "Creates a new user with email/password, age gate confirmation (18+), " +
-      "and Terms of Service acceptance. Sends a verification email.",
-  })
-  @ApiBody({
-    schema: {
-      type: "object",
-      required: ["email", "password", "ageConfirmed", "termsAccepted"],
-      properties: {
-        email: { type: "string", format: "email" },
-        password: {
-          type: "string",
-          minLength: 12,
-          maxLength: 128,
-        },
-        ageConfirmed: {
-          type: "boolean",
-          enum: [true],
-          description: "Must be true — confirms user is at least 18 years old",
-        },
-        termsAccepted: {
-          type: "boolean",
-          enum: [true],
-          description:
-            "Must be true — accepts Terms of Service and Privacy Policy",
-        },
-        policyVersion: {
-          type: "string",
-          default: "v1.0",
-        },
-        locale: {
-          type: "string",
-          enum: ["en", "ar"],
-          default: "en",
-        },
-      },
-    },
+      "Direct registration at /auth/signup has been permanently retired. " +
+      "Registration is exclusively handled by Better Auth at /api/auth/sign-up/email per ADR-002.",
+    deprecated: true,
   })
   @ApiResponse({
-    status: 201,
-    description: "User created successfully. Verification email sent.",
+    status: 410,
+    description:
+      "Endpoint retired. All signups must use /api/auth/sign-up/email.",
   })
-  @ApiResponse({
-    status: 400,
-    description: "Validation error or email already in use.",
-  })
-  @ApiResponse({
-    status: 429,
-    description: "Too many signup attempts. Try again later.",
-  })
-  async signup(@Body() body: unknown) {
-    return this.authService.signup(body);
+  async signup(): Promise<never> {
+    throw new GoneException(
+      "Direct /auth/signup endpoint is retired. Registration is exclusively handled by Better Auth at /api/auth/sign-up/email.",
+    );
   }
 
   @Delete("account")

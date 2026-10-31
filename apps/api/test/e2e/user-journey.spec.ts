@@ -38,7 +38,7 @@ import {
 import { AccountErasureService } from "../../src/privacy/account-erasure.service.js";
 import { eq } from "drizzle-orm";
 
-describe("E2E User Journey: Signup -> FLE Profile -> Upload -> Erasure", () => {
+describe("In-Process End-to-End User Journey (Fastify Injection & PGlite)", () => {
   let pg: PGlite;
   let db: Database;
   let erasureService: AccountErasureService;

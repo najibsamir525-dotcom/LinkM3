@@ -37,6 +37,7 @@ import { DATABASE_TOKEN } from "../database.module.js";
 
 export interface AccountErasureResult extends ErasureReport {
   reportDigest: string;
+  backupRetentionNotice: string;
 }
 
 @Injectable()
@@ -71,9 +72,13 @@ export class AccountErasureService
       .update(digestPayload)
       .digest("hex");
 
+    const backupRetentionNotice =
+      "Point-in-time encrypted database backups rotate and permanently expire within 30 days pursuant to LINKME Data Retention & Erasure Policy (GDPR Article 17(3)(e) / Saudi PDPL).";
+
     return {
       ...report,
       reportDigest,
+      backupRetentionNotice,
     };
   }
 

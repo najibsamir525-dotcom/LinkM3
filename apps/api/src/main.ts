@@ -13,6 +13,7 @@ import {
 } from "@nestjs/platform-fastify";
 import { DocumentBuilder, SwaggerModule } from "@nestjs/swagger";
 import { AppModule } from "./app.module.js";
+import { BETTER_AUTH_TOKEN } from "./auth/auth.module.js";
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestFastifyApplication>(
@@ -81,6 +82,47 @@ async function bootstrap(): Promise<void> {
   // ── Global Prefix ────────────────────────────────────────────────
   app.setGlobalPrefix("api", {
     exclude: ["health/live", "health/ready", "docs"],
+  });
+
+  // ── Better Auth Catch-All Handler (Single Supported Auth Engine) ─
+  const auth = app.get(BETTER_AUTH_TOKEN);
+  const fastify = app.getHttpAdapter().getInstance();
+  fastify.all("/api/auth/*", async (req: any, reply: any) => {
+    const protocol = req.protocol || "http";
+    const host = req.hostname || "localhost:4000";
+    const rawUrl = req.raw.url || req.url;
+    const url = `${protocol}://${host}${rawUrl}`;
+    const headers = new Headers();
+    for (const [key, val] of Object.entries(req.headers)) {
+      if (val !== undefined) {
+        if (Array.isArray(val)) {
+          for (const v of val) headers.append(key, v);
+        } else {
+          headers.set(key, String(val));
+        }
+      }
+    }
+
+    const hasBody = !["GET", "HEAD"].includes(req.method.toUpperCase());
+    const bodyStr = hasBody
+      ? typeof req.body === "string"
+        ? req.body
+        : JSON.stringify(req.body)
+      : undefined;
+
+    const webReq = new Request(url, {
+      method: req.method,
+      headers,
+      body: bodyStr,
+    });
+
+    const webRes = await auth.handler(webReq);
+    reply.status(webRes.status);
+    for (const [k, v] of webRes.headers.entries()) {
+      reply.header(k, v);
+    }
+    const bodyText = await webRes.text();
+    return reply.send(bodyText);
   });
 
   // ── Graceful Shutdown ────────────────────────────────────────────

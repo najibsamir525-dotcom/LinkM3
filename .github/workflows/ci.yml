@@ -83,20 +83,112 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   docker-compose-smoke:
-    name: Docker Compose Dev Stack Smoke Test
+    name: Docker Compose Dev Stack Smoke Test & Live Journey
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
 
+      - name: Setup Node.js (v22 LTS)
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: "npm"
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Packages & API
+        run: npm run build
+
       - name: Validate Compose Config
         run: docker compose config
 
-      - name: Start Dev Stack (PostgreSQL 16, Valkey 7.2, MinIO, Mailpit)
+      - name: Start Dev Stack with Healthchecks
         run: |
           docker compose up -d
-          sleep 12
+          echo "Waiting for PostgreSQL 16 and Valkey 7.2 to become healthy..."
+          for i in {1..30}; do
+            PG_STATUS=$(docker compose exec -T postgres pg_isready -U linkme_user -d linkme_db 2>&1 || true)
+            VALKEY_STATUS=$(docker compose exec -T valkey valkey-cli ping 2>&1 || true)
+            if [[ "$PG_STATUS" =~ "accepting connections" ]] && [[ "$VALKEY_STATUS" =~ "PONG" ]]; then
+              echo "✅ PostgreSQL 16 and Valkey 7.2 healthy!"
+              break
+            fi
+            sleep 2
+          done
           docker compose ps
-          docker compose exec -T postgres pg_isready -U linkme_user -d linkme_db
-          docker compose exec -T valkey valkey-cli ping
-          docker compose down -v
+
+      - name: Run Schema Migrations Against Live PostgreSQL 16
+        run: |
+          docker compose exec -T postgres psql -U linkme_user -d linkme_db -f - < packages/db/drizzle/0000_init.sql
+          TABLE_COUNT=$(docker compose exec -T postgres psql -U linkme_user -d linkme_db -t -c "SELECT count(*) FROM information_schema.tables WHERE table_schema='public';")
+          echo "✅ Relational Tables Created: $TABLE_COUNT"
+          [ "$TABLE_COUNT" -ge 35 ]
+
+      - name: Start Live API & Validate Health, Deprecation & Auth Journey
+        env:
+          DATABASE_URL: "postgresql://linkme_user:linkme_secret_pass@localhost:5432/linkme_db"
+          VALKEY_URL: "redis://localhost:6379"
+          ENCRYPTION_MASTER_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+          BETTER_AUTH_SECRET: "linkme-dev-secret-must-be-at-least-32-chars-long-12345"
+          APP_URL: "http://localhost:3000"
+          FRONTEND_URL: "http://localhost:3000"
+          PORT: 4000
+          NODE_ENV: "production"
+        run: |
+          node apps/api/dist/src/main.js &
+          API_PID=$!
+          echo "API spawned with PID: $API_PID"
+
+          echo "Polling http://localhost:4000/health/ready..."
+          for i in {1..30}; do
+            if curl -s -f http://localhost:4000/health/ready; then
+              echo "✅ API /health/ready is UP!"
+              break
+            fi
+            sleep 1
+          done
+
+          echo "1. Verify /health/live"
+          LIVE_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:4000/health/live)
+          echo "/health/live status: $LIVE_STATUS"
+          [ "$LIVE_STATUS" -eq 200 ]
+
+          echo "2. Verify /health/ready"
+          READY_STATUS=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:4000/health/ready)
+          echo "/health/ready status: $READY_STATUS"
+          [ "$READY_STATUS" -eq 200 ]
+
+          echo "3. Verify legacy /api/auth/signup is locked down (410 Gone)"
+          GONE_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST http://localhost:4000/api/auth/signup \
+            -H "Content-Type: application/json" \
+            -d '{"email":"legacy@linkme.cv"}')
+          echo "Deprecated /api/auth/signup status: $GONE_STATUS"
+          [ "$GONE_STATUS" -eq 410 ]
+
+          echo "4. Single Supported Signup via Better Auth (/api/auth/sign-up/email)"
+          SIGNUP_HTTP=$(curl -s -o /tmp/signup_resp.json -w "%{http_code}" -X POST http://localhost:4000/api/auth/sign-up/email \
+            -H "Content-Type: application/json" \
+            -H "Origin: http://localhost:3000" \
+            -d '{"name":"Smoke Tester","email":"smoke.tester@linkme.cv","password":"ValidNistPassword2026!","ageConfirmed":true,"termsAccepted":true}')
+          cat /tmp/signup_resp.json
+          echo ""
+          echo "Signup HTTP Code: $SIGNUP_HTTP"
+          [ "$SIGNUP_HTTP" -eq 200 ]
+
+          echo "5. Login via Better Auth (/api/auth/sign-in/email)"
+          SIGNIN_HTTP=$(curl -s -o /tmp/signin_resp.json -w "%{http_code}" -X POST http://localhost:4000/api/auth/sign-in/email \
+            -H "Content-Type: application/json" \
+            -H "Origin: http://localhost:3000" \
+            -d '{"email":"smoke.tester@linkme.cv","password":"ValidNistPassword2026!"}')
+          cat /tmp/signin_resp.json
+          echo ""
+          echo "Signin HTTP Code: $SIGNIN_HTTP"
+          [ "$SIGNIN_HTTP" -eq 200 ]
+
+          kill $API_PID || true
+
+      - name: Teardown Stack
+        if: always()
+        run: docker compose down -v

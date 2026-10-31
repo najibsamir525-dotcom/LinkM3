@@ -67,9 +67,9 @@ services:
         limits:
           memory: 192M
 
-  # Local S3-compatible storage for development (replaces Cloudflare R2)
+  # Local S3-compatible storage for development (replaces Cloudflare R2 per ADR-004)
   minio:
-    image: bitnamilegacy/minio:latest
+    image: bitnamilegacy/minio:2025.7.23-debian-12-r5
     container_name: linkme-minio
     restart: unless-stopped
     environment:

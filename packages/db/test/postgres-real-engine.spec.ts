@@ -87,6 +87,16 @@ describe("Real PostgreSQL 16 Engine: Migrations & Constraint Enforcement", () =>
   });
 
   describe("Schema Deployment & Table Verification", () => {
+    it("connects to PostgreSQL engine and verifies version", async () => {
+      const res = await pg.query<{ version: string }>("SELECT version()");
+      const versionStr = res.rows[0]?.version ?? "";
+      console.log("PostgreSQL Version Output:", versionStr);
+      expect(versionStr.length).toBeGreaterThan(0);
+      if (process.env["DATABASE_URL"]) {
+        expect(versionStr.toLowerCase()).toContain("postgresql 16");
+      }
+    });
+
     it("creates all 35 relational tables in PostgreSQL catalog", async () => {
       const res = await pg.query<{ count: string }>(
         "SELECT count(*)::text as count FROM information_schema.tables WHERE table_schema = 'public'",

@@ -1,32 +1,21 @@
 import { describe, it, expect, vi } from "vitest";
 import { AuthController } from "../../src/auth/auth.controller.js";
 import { AuthService } from "../../src/auth/auth.service.js";
+import { GoneException } from "@nestjs/common";
 import type { FastifyRequest } from "fastify";
 
 describe("AuthController", () => {
-  it("signup delegates to AuthService.signup", async () => {
+  it("rejects direct /auth/signup with GoneException (enforces single signup path via Better Auth)", async () => {
     const mockAuthService = {
-      signup: vi.fn().mockResolvedValue({
-        id: "usr_123",
-        email: "test@example.com",
-        status: "PENDING_VERIFICATION",
-        locale: "en",
-      }),
       deleteAccount: vi.fn(),
     } as unknown as AuthService;
 
     const controller = new AuthController(mockAuthService);
 
-    const payload = {
-      email: "test@example.com",
-      password: "MySecurePassword2026",
-      ageConfirmed: true,
-      termsAccepted: true,
-    };
-
-    const result = await controller.signup(payload);
-    expect(mockAuthService.signup).toHaveBeenCalledWith(payload);
-    expect(result.id).toBe("usr_123");
+    await expect(controller.signup()).rejects.toThrow(GoneException);
+    await expect(controller.signup()).rejects.toThrow(
+      /Direct \/auth\/signup endpoint is retired/,
+    );
   });
 
   it("deleteAccount extracts userId from request and calls AuthService.deleteAccount", async () => {

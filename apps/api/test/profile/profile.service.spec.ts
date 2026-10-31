@@ -88,6 +88,39 @@ describe("ProfileService", () => {
       expect(profile.city).toBe("Beirut");
       expect(profile.links).toHaveLength(1);
     });
+
+    it("returns null for phone and city and empty array for links when they are null or missing", async () => {
+      const mockDb = {
+        select: vi.fn().mockReturnValue({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([
+                {
+                  id: "prof_empty",
+                  userId: userA,
+                  fullName: "Empty User",
+                  headline: null,
+                  bio: null,
+                  photoAssetId: null,
+                  phoneEncrypted: null,
+                  cityEncrypted: null,
+                  links: null,
+                  createdAt: new Date("2026-01-01"),
+                  updatedAt: new Date("2026-01-02"),
+                },
+              ]),
+            }),
+          }),
+        }),
+      } as unknown as Database;
+
+      const service = new ProfileService(mockDb, configService);
+      const profile = await service.getProfile(userA, userA);
+
+      expect(profile.phone).toBeNull();
+      expect(profile.city).toBeNull();
+      expect(profile.links).toEqual([]);
+    });
   });
 
   describe("updateProfile (Anti-IDOR & FLE Encryption)", () => {
@@ -156,6 +189,59 @@ describe("ProfileService", () => {
         MASTER_KEY_HEX,
       );
       expect(decryptedPhone).toBe("+961-71-998877");
+    });
+
+    it("encrypts optional sensitiveFields when provided and handles null phone/city", async () => {
+      let capturedSetValues: Record<string, unknown> = {};
+
+      const mockDb = {
+        update: vi.fn().mockReturnValue({
+          set: vi.fn().mockImplementation((values: Record<string, unknown>) => {
+            capturedSetValues = values;
+            return {
+              where: vi.fn().mockReturnValue({
+                returning: vi.fn().mockResolvedValue([
+                  {
+                    id: "prof_sensitive",
+                    userId: userA,
+                    fullName: "Sensitive User",
+                    headline: null,
+                    bio: null,
+                    photoAssetId: null,
+                    phoneEncrypted: null,
+                    cityEncrypted: null,
+                    links: null,
+                    createdAt: new Date("2026-01-01"),
+                    updatedAt: new Date("2026-01-03"),
+                  },
+                ]),
+              }),
+            };
+          }),
+        }),
+      } as unknown as Database;
+
+      const service = new ProfileService(mockDb, configService);
+
+      const updateInput = {
+        fullName: "Sensitive User",
+        sensitiveFields: {
+          gender: "prefer_not_to_say",
+          nationality: "LB",
+        },
+        links: [],
+      };
+
+      const result = await service.updateProfile(userA, userA, updateInput);
+
+      expect(result.phone).toBeNull();
+      expect(result.city).toBeNull();
+      expect(
+        capturedSetValues["optionalSensitiveFieldsEncrypted"],
+      ).toBeDefined();
+      expect(capturedSetValues["optionalSensitiveFieldsEncrypted"]).toMatch(
+        /^v1:/,
+      );
     });
 
     it("throws BadRequestException when update input fails schema validation", async () => {

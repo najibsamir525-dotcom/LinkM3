@@ -203,4 +203,35 @@ describe("Better Auth Internal Compliance Hooks", () => {
       expect(consents[0]?.granted).toBe(true);
     });
   });
+
+  describe("Argon2id Password Verification on Sign-In (covers password.verify)", () => {
+    it("verifies Argon2id hash on signInEmail and establishes session", async () => {
+      // Mark email as verified to allow sign-in under requireEmailVerification: true
+      await pg.exec(
+        `UPDATE "user" SET email_verified = true WHERE email = 'compliant@linkme.cv'`,
+      );
+
+      const signInRes = await auth.api.signInEmail({
+        body: {
+          email: "compliant@linkme.cv",
+          password: "SuperSecureCorrectHorseBatteryStaple2026!",
+        },
+      });
+
+      expect(signInRes).toBeDefined();
+      expect(signInRes.user.email).toBe("compliant@linkme.cv");
+      expect(signInRes.token).toBeDefined();
+    });
+
+    it("rejects invalid password on signInEmail", async () => {
+      await expect(
+        auth.api.signInEmail({
+          body: {
+            email: "compliant@linkme.cv",
+            password: "WrongPassword2026!",
+          },
+        }),
+      ).rejects.toThrow();
+    });
+  });
 });

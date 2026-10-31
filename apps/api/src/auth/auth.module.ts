@@ -17,10 +17,22 @@
 import { Module } from "@nestjs/common";
 import { AuthController } from "./auth.controller.js";
 import { AuthService } from "./auth.service.js";
+import { DATABASE_TOKEN } from "../database.module.js";
+import { createBetterAuth } from "./better-auth.config.js";
+import type { Database } from "@linkme/db";
+
+export const BETTER_AUTH_TOKEN = "BETTER_AUTH_TOKEN";
 
 @Module({
   controllers: [AuthController],
-  providers: [AuthService],
-  exports: [AuthService],
+  providers: [
+    AuthService,
+    {
+      provide: BETTER_AUTH_TOKEN,
+      inject: [DATABASE_TOKEN],
+      useFactory: (db: Database) => createBetterAuth(db),
+    },
+  ],
+  exports: [AuthService, BETTER_AUTH_TOKEN],
 })
 export class AuthModule {}

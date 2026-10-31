@@ -52,5 +52,5 @@ All fonts, icons, libraries, and assets utilized in the LINKME platform are stri
 
 | Tool | Purpose | License | Production Exclusion Guarantee |
 | :--- | :--- | :--- | :--- |
-| **MinIO** | Local offline S3 emulation (`docker-compose.yml`) | AGPL-3.0 | **STRICTLY EXCLUDED** from all production builds, container images, and runtime artifacts. The application code uses `@aws-sdk/client-s3` (Apache-2.0) interacting over standard HTTPS/S3 API. In staging/production, the object storage target is Cloudflare R2 (or any commercial S3-compatible service). No MinIO binary, library, or container is ever shipped or executed in production. |
+| **MinIO (Pinned: `bitnamilegacy/minio:2025.7.23-debian-12-r5`)** | Local offline S3 emulation (`docker-compose.yml`, see ADR-004) | AGPL-3.0 | **STRICTLY EXCLUDED** from all production builds, container images, and runtime artifacts. The application code uses `@aws-sdk/client-s3` (Apache-2.0) interacting over standard HTTPS/S3 API. In staging/production, the object storage target is Cloudflare R2 (or any commercial S3-compatible service). No MinIO binary, library, or container is ever shipped or executed in production. |
 
