@@ -77,15 +77,26 @@ jobs:
       - name: NPM Security Audit
         run: npm audit --audit-level=high
 
-      - name: Docker Compose Smoke Test
-        run: |
-          docker compose config
-          docker compose up -d postgres valkey mailpit
-          sleep 5
-          docker compose ps
-          docker compose down
-
       - name: Secret Scanning (Gitleaks)
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  docker-compose-smoke:
+    name: Docker Compose Dev Stack Smoke Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Validate Compose Config
+        run: docker compose config
+
+      - name: Start Dev Stack (PostgreSQL 16, Valkey 7.2, MinIO, Mailpit)
+        run: |
+          docker compose up -d
+          sleep 12
+          docker compose ps
+          docker compose exec -T postgres pg_isready -U linkme_user -d linkme_db
+          docker compose exec -T valkey valkey-cli ping
+          docker compose down -v
