@@ -1,7 +1,8 @@
 # Phase 1 Production Hardening Backlog
 
 **Document Status:** Active Tracking  
-**Gate Requirement:** All items must be completed and verified before accepting real production user traffic.
+**Gate Requirement:** All items must be completed and verified before accepting real production user traffic.  
+**Repository Authentication:** Limited-scope GitHub token verified.
 
 ---
 
