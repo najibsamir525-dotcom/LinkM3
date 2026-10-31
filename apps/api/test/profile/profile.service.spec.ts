@@ -157,5 +157,43 @@ describe("ProfileService", () => {
       );
       expect(decryptedPhone).toBe("+961-71-998877");
     });
+
+    it("throws BadRequestException when update input fails schema validation", async () => {
+      const mockDb = {} as Database;
+      const service = new ProfileService(mockDb, configService);
+
+      // Invalid input (fullName missing, invalid links structure)
+      const invalidInput = {
+        fullName: 12345, // invalid type
+        links: "not-an-array",
+      };
+
+      await expect(
+        service.updateProfile(userA, userA, invalidInput),
+      ).rejects.toThrowError("Validation failed");
+    });
+
+    it("throws NotFoundException when profile to update does not exist in database", async () => {
+      const mockDb = {
+        update: vi.fn().mockReturnValue({
+          set: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              returning: vi.fn().mockResolvedValue([]), // Empty array triggers line 143
+            }),
+          }),
+        }),
+      } as unknown as Database;
+
+      const service = new ProfileService(mockDb, configService);
+
+      const validInput = {
+        fullName: "Valid Name",
+        links: [],
+      };
+
+      await expect(
+        service.updateProfile(userA, userA, validInput),
+      ).rejects.toThrow(NotFoundException);
+    });
   });
 });

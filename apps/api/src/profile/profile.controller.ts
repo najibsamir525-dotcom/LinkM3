@@ -13,12 +13,25 @@ import {
   Req,
   HttpCode,
   HttpStatus,
+  UseGuards,
 } from "@nestjs/common";
-import { ApiTags, ApiOperation, ApiResponse, ApiParam } from "@nestjs/swagger";
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiParam,
+  ApiBearerAuth,
+} from "@nestjs/swagger";
 import { ProfileService } from "./profile.service.js";
+import {
+  AuthGuard,
+  type AuthenticatedRequest,
+} from "../common/guards/auth.guard.js";
 import type { FastifyRequest } from "fastify";
 
 @ApiTags("profile")
+@ApiBearerAuth()
+@UseGuards(AuthGuard)
 @Controller("profile")
 export class ProfileController {
   constructor(private readonly profileService: ProfileService) {}
@@ -36,9 +49,7 @@ export class ProfileController {
     @Param("userId") userId: string,
     @Req() req: FastifyRequest,
   ) {
-    // TODO: Extract from auth session
-    const requestingUserId =
-      (req as FastifyRequest & { userId?: string }).userId ?? userId;
+    const requestingUserId = (req as AuthenticatedRequest).userId ?? userId;
     return this.profileService.getProfile(userId, requestingUserId);
   }
 
@@ -56,8 +67,7 @@ export class ProfileController {
     @Body() body: unknown,
     @Req() req: FastifyRequest,
   ) {
-    const requestingUserId =
-      (req as FastifyRequest & { userId?: string }).userId ?? userId;
+    const requestingUserId = (req as AuthenticatedRequest).userId ?? userId;
     return this.profileService.updateProfile(userId, requestingUserId, body);
   }
 }

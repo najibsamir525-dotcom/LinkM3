@@ -10,6 +10,7 @@ import {
   Inject,
   NotFoundException,
   ForbiddenException,
+  BadRequestException,
 } from "@nestjs/common";
 import { ConfigService } from "@nestjs/config";
 import { eq } from "drizzle-orm";
@@ -105,7 +106,7 @@ export class ProfileService {
     });
 
     if (!parsed.success) {
-      throw new NotFoundException("Validation failed");
+      throw new BadRequestException("Validation failed");
     }
 
     const data = parsed.data;

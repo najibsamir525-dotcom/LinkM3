@@ -37,6 +37,22 @@ describe("ProfileController", () => {
     expect(result.fullName).toBe("Omar Developer");
   });
 
+  it("getProfile falls back to param userId when req.userId is undefined", async () => {
+    const mockProfileService = {
+      getProfile: vi.fn().mockResolvedValue(mockProfile),
+      updateProfile: vi.fn(),
+    } as unknown as ProfileService;
+
+    const controller = new ProfileController(mockProfileService);
+    const mockRequest = {} as FastifyRequest;
+
+    await controller.getProfile("usr_1", mockRequest);
+    expect(mockProfileService.getProfile).toHaveBeenCalledWith(
+      "usr_1",
+      "usr_1",
+    );
+  });
+
   it("updateProfile delegates to ProfileService with payload and requesting userId", async () => {
     const mockProfileService = {
       getProfile: vi.fn(),
@@ -60,5 +76,27 @@ describe("ProfileController", () => {
       body,
     );
     expect(result.fullName).toBe("Omar Updated");
+  });
+
+  it("updateProfile falls back to param userId when req.userId is undefined", async () => {
+    const mockProfileService = {
+      getProfile: vi.fn(),
+      updateProfile: vi.fn().mockResolvedValue({
+        ...mockProfile,
+        fullName: "Omar Updated",
+      }),
+    } as unknown as ProfileService;
+
+    const controller = new ProfileController(mockProfileService);
+    const mockRequest = {} as FastifyRequest;
+
+    const body = { fullName: "Omar Updated", links: [] };
+    await controller.updateProfile("usr_1", body, mockRequest);
+
+    expect(mockProfileService.updateProfile).toHaveBeenCalledWith(
+      "usr_1",
+      "usr_1",
+      body,
+    );
   });
 });

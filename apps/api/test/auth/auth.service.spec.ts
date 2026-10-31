@@ -89,6 +89,81 @@ describe("AuthService", () => {
       await expect(service.signup(input)).rejects.toThrow(BadRequestException);
     });
 
+    it("rejects signup when password policy validator check fails after schema parse", async () => {
+      const mockDb = {} as Database;
+      const service = new AuthService(mockDb, configService);
+
+      // Spy on PasswordPolicyValidator.validate to trigger line 72-74
+      const validateSpy = vi.spyOn(
+        await import("@linkme/domain"),
+        "PasswordPolicyValidator",
+        "get",
+      );
+
+      const realDomain = await import("@linkme/domain");
+      const realValidate = realDomain.PasswordPolicyValidator.validate;
+
+      let callCount = 0;
+      vi.spyOn(
+        realDomain.PasswordPolicyValidator,
+        "validate",
+      ).mockImplementation((pwd: string) => {
+        callCount++;
+        // First call in safeParse returns valid
+        if (callCount === 1) return { valid: true, errors: [] };
+        // Second call in service triggers line 72-74
+        return {
+          valid: false,
+          errors: ["Custom security policy violation"],
+        };
+      });
+
+      const input = {
+        email: "user-policy@example.com",
+        password: "ValidPassphrase2026!Secure",
+        ageConfirmed: true,
+        termsAccepted: true,
+      };
+
+      await expect(service.signup(input)).rejects.toThrow(BadRequestException);
+      vi.restoreAllMocks();
+    });
+
+    it("throws error when user record insertion fails inside transaction", async () => {
+      const mockDb = {
+        select: vi.fn().mockReturnValue({
+          from: vi.fn().mockReturnValue({
+            where: vi.fn().mockReturnValue({
+              limit: vi.fn().mockResolvedValue([]),
+            }),
+          }),
+        }),
+        transaction: vi.fn().mockImplementation(async (callback) => {
+          const mockTx = {
+            insert: vi.fn().mockReturnValue({
+              values: vi.fn().mockReturnValue({
+                returning: vi.fn().mockResolvedValue([]), // Empty array triggers line 124
+              }),
+            }),
+          };
+          return callback(mockTx);
+        }),
+      } as unknown as Database;
+
+      const service = new AuthService(mockDb, configService);
+
+      const input = {
+        email: "fail-create@example.com",
+        password: "MySuperSecretValidPassword2026",
+        ageConfirmed: true,
+        termsAccepted: true,
+      };
+
+      await expect(service.signup(input)).rejects.toThrowError(
+        "Failed to create user record",
+      );
+    });
+
     it("creates user record with Argon2id hash, age confirmation, and consent record", async () => {
       const insertedRows: Record<string, unknown>[] = [];
 
