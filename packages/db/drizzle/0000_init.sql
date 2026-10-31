@@ -482,3 +482,67 @@ CREATE INDEX "idx_skills_profile" ON "skills" USING btree ("profile_id");--> sta
 CREATE INDEX "idx_subscriptions_user" ON "subscriptions" USING btree ("user_id");--> statement-breakpoint
 CREATE UNIQUE INDEX "uq_users_email" ON "users" USING btree ("email_normalized");--> statement-breakpoint
 CREATE INDEX "idx_users_status_deleted" ON "users" USING btree ("status","deleted_at");
+--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS "user" (
+	"id" text PRIMARY KEY NOT NULL,
+	"name" text NOT NULL,
+	"email" text NOT NULL UNIQUE,
+	"email_verified" boolean DEFAULT false NOT NULL,
+	"image" text,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	"two_factor_enabled" boolean DEFAULT false,
+	"age_confirmed" boolean DEFAULT false NOT NULL,
+	"age_confirmed_at" timestamp,
+	"age_policy_version" text DEFAULT 'v1.0' NOT NULL,
+	"terms_accepted" boolean DEFAULT false NOT NULL,
+	"role" text DEFAULT 'USER' NOT NULL,
+	"status" text DEFAULT 'PENDING_VERIFICATION' NOT NULL,
+	"locale" text DEFAULT 'en' NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS "session" (
+	"id" text PRIMARY KEY NOT NULL,
+	"expires_at" timestamp NOT NULL,
+	"token" text NOT NULL UNIQUE,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	"ip_address" text,
+	"user_agent" text,
+	"user_id" text NOT NULL REFERENCES "user"("id") ON DELETE cascade
+);
+--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS "account" (
+	"id" text PRIMARY KEY NOT NULL,
+	"account_id" text NOT NULL,
+	"provider_id" text NOT NULL,
+	"user_id" text NOT NULL REFERENCES "user"("id") ON DELETE cascade,
+	"access_token" text,
+	"refresh_token" text,
+	"id_token" text,
+	"access_token_expires_at" timestamp,
+	"refresh_token_expires_at" timestamp,
+	"scope" text,
+	"password" text,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS "verification" (
+	"id" text PRIMARY KEY NOT NULL,
+	"identifier" text NOT NULL,
+	"value" text NOT NULL,
+	"expires_at" timestamp NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
+CREATE TABLE IF NOT EXISTS "two_factor" (
+	"id" text PRIMARY KEY NOT NULL,
+	"secret" text NOT NULL,
+	"backup_codes" text NOT NULL,
+	"verified" boolean DEFAULT false,
+	"failed_verification_count" integer DEFAULT 0,
+	"locked_until" timestamp,
+	"user_id" text NOT NULL REFERENCES "user"("id") ON DELETE cascade
+);

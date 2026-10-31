@@ -97,11 +97,11 @@ describe("Real PostgreSQL 16 Engine: Migrations & Constraint Enforcement", () =>
       }
     });
 
-    it("creates all 35 relational tables in PostgreSQL catalog", async () => {
+    it("creates all 40 relational tables in PostgreSQL catalog (35 domain + 5 Better Auth)", async () => {
       const res = await pg.query<{ count: string }>(
         "SELECT count(*)::text as count FROM information_schema.tables WHERE table_schema = 'public'",
       );
-      expect(Number(res.rows[0]?.count)).toBe(35);
+      expect(Number(res.rows[0]?.count)).toBe(40);
     });
 
     it("creates all 9 custom enum types in pg_type", async () => {
@@ -333,11 +333,11 @@ describe("Real PostgreSQL 16 Engine: Migrations & Constraint Enforcement", () =>
         await pg.exec(stmt);
       }
 
-      // Verify all 35 tables are cleanly restored
+      // Verify all 40 tables are cleanly restored
       const res = await pg.query<{ count: string }>(
         "SELECT count(*)::text as count FROM information_schema.tables WHERE table_schema = 'public'",
       );
-      expect(Number(res.rows[0]?.count)).toBe(35);
+      expect(Number(res.rows[0]?.count)).toBe(40);
     });
   });
 });

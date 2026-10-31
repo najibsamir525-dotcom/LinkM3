@@ -124,7 +124,7 @@ jobs:
           docker compose exec -T postgres psql -U linkme_user -d linkme_db -f - < packages/db/drizzle/0000_init.sql
           TABLE_COUNT=$(docker compose exec -T postgres psql -U linkme_user -d linkme_db -t -c "SELECT count(*) FROM information_schema.tables WHERE table_schema='public';")
           echo "✅ Relational Tables Created: $TABLE_COUNT"
-          [ "$TABLE_COUNT" -ge 35 ]
+          [ "$TABLE_COUNT" -ge 40 ]
 
       - name: Start Live API & Validate Health, Deprecation & Auth Journey
         env:
