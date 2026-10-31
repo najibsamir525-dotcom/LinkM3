@@ -304,3 +304,160 @@ export interface AiProvider {
 | **Google Gemini API (Pay-as-you-go / Paid)** | Yes                             | **NO.** Under paid API terms, data is NOT used to train Google models.                                | ✅ Permitted for Paid mode (Phase 3+).                         |
 | **OpenAI API (Paid / Platform)**             | Yes                             | **NO.** OpenAI API business terms default to zero training on API inputs.                             | ✅ Permitted for BYOK and Paid mode.                           |
 | **Local Ollama / Llama 3 (Self-Hosted)**     | Yes (Llama 3 Community License) | **NO.** Runs entirely on local machine/server; 100% private.                                          | ⚠️ Resource heavy: requires GPU or >= 16GB RAM VM.             |
+
+---
+
+## 6. Comprehensive Zero-Cost Monitoring, Observability & Alerting
+
+### 6.1 Monitoring Component Audit & Quota Boundaries
+
+| Component                | Free Provider & Tier                             | Limits & Quota Boundaries (Verified Commercial)                                                                                                        | What Happens When Limit Exceeded                                                                                  | Cheapest Upgrade Path                                                            |
+| :----------------------- | :----------------------------------------------- | :----------------------------------------------------------------------------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------- |
+| **Uptime Monitoring**    | **Better Uptime / Cronitor / Gatus** (Free Tier) | • 50 HTTP/HTTPS monitors<br/>• 3-minute checks on `/health/live` & public page<br/>• Email & Webhook notifications                                     | Checks pause or alert frequency drops to 10 min; existing alerts fire.                                            | Better Uptime Freelance ($10/mo) or self-hosted Gatus container (0 cost).        |
+| **Error Tracking**       | **Sentry Developer (Free Tier)**                 | • 5,000 error events / month<br/>• 10,000 performance units / month<br/>• PII scrubbing active before event transmission                               | Additional error events are dropped until the monthly cycle resets. Local Pino logs still capture 100% of errors. | Sentry Team ($26/mo) or self-hosted GlitchTip (Docker on VM, 100% open source).  |
+| **System & App Metrics** | **Hosted Grafana Cloud (Free Tier)**             | • 10,000 active metric series<br/>• 50 GB log volume / month<br/>• 50 GB trace volume / month<br/>• 3 alert rules with 14-day data retention           | Ingestion soft-caps; older metrics age out after 14 days. No surprise billing.                                    | Grafana Pro ($29/mo + usage) or self-hosted Prometheus/cAdvisor on VM.           |
+| **Structured Logs**      | **Pino (Structured JSON) + logrotate**           | • Capped strictly by host disk allocation (5 GB max for logs)<br/>• 30-day retention with daily gzip rotation<br/>• In-memory PII serializer redaction | logrotate prunes files older than 30 days; disk never fills.                                                      | Offload archived compressed logs to Cloudflare R2 archive bucket ($0.015/GB-mo). |
+| **Cron Job Heartbeats**  | **Healthchecks.io (Free Tier)**                  | • 20 distinct check endpoints<br/>• Pings on automated backup and account deletion cleanup jobs<br/>• Dead-man's switch alerts on missed execution     | Missing checks trigger Telegram / Email alert after configurable grace period.                                    | Healthchecks Supporter plan ($5/mo for 100 checks) or self-hosted Healthchecks.  |
+| **Alert Notification**   | **Telegram Bot API + SMTP**                      | • Unlimited messages via Telegram Bot API<br/>• Zero cost forever, commercial use permitted<br/>• Instant push notifications on iOS/Android/Desktop    | Rate limited to 30 messages/second (unreachable in standard operational alert flows).                             | None needed; Telegram Bot API is permanently free and robust.                    |
+
+### 6.2 Why Hosted Grafana Cloud is Preferred Over Self-Hosted Prometheus on Small VMs
+
+On resource-constrained single-VM hosts (e.g., 1-4 OCPUs, 1-6 GB RAM), running Prometheus (`~500MB - 1GB RAM`), Alertmanager (`~100MB`), and Grafana (`~250MB`) consumes over 1.5 GB of system memory simply to monitor the node. Utilizing Grafana Cloud's generous Free Tier allows shipping metrics and logs via lightweight OpenTelemetry / Grafana Alloy agents consuming less than 40 MB of RAM, reserving 95%+ of VM compute exclusively for application workloads (Postgres, Valkey, NestJS API, Chromium).
+
+### 6.3 PII & Secret Scrubbing Specification (Pino & Sentry)
+
+All application logging and error reporting enforce mandatory data minimization:
+
+1. **Pino Serializers:** Redact keys matching `password`, `token`, `secret`, `authorization`, `cookie`, `phone`, `email`, `city`, `credit_card`.
+2. **Sentry `beforeSend` Sanitization:**
+   - Strips request headers: `Authorization`, `Cookie`, `X-CSRF-Token`.
+   - Clears query parameters containing tokens or session IDs.
+   - Sets user context to pseudonymous hash (`id: sha256(user.id)`), never raw email or IP.
+   - Replaces IPv4/IPv6 with anonymized subnets (`192.168.1.0/24`, `2001:db8::/64`).
+
+### 6.4 Operational Alerting Rules Matrix (Telegram & Email)
+
+| Alert Trigger                | Evaluation Window            | Threshold                             | Severity          | Immediate Action Required                                          |
+| :--------------------------- | :--------------------------- | :------------------------------------ | :---------------- | :----------------------------------------------------------------- |
+| **Site Down**                | 2 consecutive checks (2 min) | `/health/live` != 200                 | **P1 - Critical** | Execute Site Down Runbook (`docs/runbooks/site-down.md`)           |
+| **Database Unhealthy**       | 1 check (1 min)              | `/health/ready` == 503                | **P1 - Critical** | Inspect Postgres container status, locks, and disk space           |
+| **High Error Spike**         | 5-minute rolling window      | > 10 unhandled errors/min             | **P2 - High**     | Review Sentry issue dashboard and recent deploy commits            |
+| **Host Disk Utilization**    | Continuous                   | > 80% disk space used                 | **P2 - High**     | Execute DB Full Runbook (`docs/runbooks/db-full.md`)               |
+| **Host Memory Exhaustion**   | 3-minute sustained           | > 85% RAM utilization                 | **P2 - High**     | Inspect Valkey memory, leak in API, or Chromium orphan processes   |
+| **Backup Job Missed**        | Daily schedule + 1 hr grace  | Healthchecks.io ping missing          | **P2 - High**     | Execute Backup Restore Runbook (`docs/runbooks/backup-restore.md`) |
+| **PDF Worker Failure Rate**  | 15-minute window             | > 5% export failure rate              | **P3 - Medium**   | Restart Chromium worker container, check memory limits             |
+| **Queue Backlog Spike**      | 10-minute window             | > 20 jobs pending in BullMQ           | **P3 - Medium**   | Investigate worker throughput or scale concurrency to 2            |
+| **Brute Force / Auth Spike** | 1-minute window              | > 5 failed logins / min per IP        | **P3 - Medium**   | Verify automated rate limiting / IP ban triggered                  |
+| **Free-Tier Limit Approach** | Daily aggregation            | > 80% of any free tier (R2/Sentry/DB) | **P3 - Medium**   | Review usage trends, execute data retention purge if applicable    |
+
+---
+
+## 7. Multi-Environment Topology & Shared-Failure Risk Analysis
+
+### 7.1 Environment Isolation Grid
+
+| Parameter          | Local Development              | CI Runner (Ephemeral)        | Staging                                                       | Production                            |
+| :----------------- | :----------------------------- | :--------------------------- | :------------------------------------------------------------ | :------------------------------------ |
+| **Target Host**    | Developer workstation          | GitHub Actions Ubuntu runner | Dedicated Project on Host VM                                  | Dedicated Project on Host VM          |
+| **Database**       | Local Postgres (`5432`)        | Ephemeral Testcontainers PG  | `linkme_db_staging`                                           | `linkme_db_production`                |
+| **Secrets & Keys** | `.env` (gitignored, mock keys) | GitHub Action Secrets        | Dedicated Staging Keyring                                     | Restricted `.env.production` (`0600`) |
+| **Encryption MEK** | Distinct Dev Hex Key           | Distinct CI Hex Key          | Distinct Staging Hex Key                                      | Distinct Production Hex Key           |
+| **Data Seed**      | Developer fixtures             | Ephemeral test fixtures      | **Synthetic data only (Faker)**                               | Real user data (FLE encrypted)        |
+| **Data Copy Rule** | N/A                            | N/A                          | **STRICT PROHIBITION: Never copy production data to staging** | Strict access control                 |
+
+### 7.2 Shared-Failure Risk Analysis (Staging & Production on Same VM)
+
+Running Staging and Production as two distinct Docker Compose projects (`linkme-prod` and `linkme-staging`) on a single shared VM enables true $0 infrastructure for the MVP, but introduces shared-fate failure modes:
+
+| Failure Mode                  | Risk Description                                                                                                     | Architectural Mitigation                                                                                                                                                                                                |
+| :---------------------------- | :------------------------------------------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **CPU Starvation**            | Staging load tests or heavy test runs saturate CPU cores, throttling production API response latency.                | Apply Docker Compose `cpus: "1.0"` limits on all staging services; production services have priority reservation (`cpus: "2.5"`).                                                                                       |
+| **Memory Exhaustion (OOM)**   | Memory leak in staging container causes Linux kernel OOM Killer to indiscriminately kill production Postgres or API. | Set strict `mem_limit` and `mem_reservation` on every container. Staging stack total RAM is capped to 25% of VM capacity.                                                                                               |
+| **Disk Exhaustion**           | Unchecked staging logs or database dumps fill the root filesystem, forcing production Postgres into read-only panic. | Staging database runs on a separate mount/quota, and staging logs are capped to 1 GB max with aggressive 3-day logrotate.                                                                                               |
+| **Port & Network Collisions** | Staging binds to production ports (e.g. 5432 or 80) causing deployment collision.                                    | Staging services are completely unmapped to host ports; internal communication occurs over private isolated bridge network (`staging-net`). Gateway routes traffic by Host header (`staging.linkme.cv` vs `linkme.cv`). |
+| **Shared Kernel Panic**       | Catastrophic kernel bug or physical hardware fault halts the underlying VM.                                          | Documented in Disaster Recovery: automated R2 backups and one-command recreate script allow spinning up the stack on an alternate cloud provider in under 15 minutes.                                                   |
+
+---
+
+## 8. Zero-Cost CI/CD Pipeline Specification
+
+### 8.1 GitHub Actions Workflow Architecture
+
+```mermaid
+flowchart TD
+    PR[Pull Request Opened / Updated] --> LINT[Format & Typecheck]
+    LINT --> UNIT[Unit Tests with Coverage]
+    UNIT --> INT[Integration Tests with Testcontainers]
+    INT --> SEC[Security Scans: Gitleaks, npm audit, Semgrep, Trivy]
+    SEC --> E2E[Playwright Critical Flows & Axe WCAG 2.2 AA]
+    E2E --> GATE{All Checks Pass?}
+    GATE -- No --> REJECT[Block Merge]
+    GATE -- Yes --> MERGE[Merge to main]
+
+    MERGE --> BUILD[Build Multi-arch Container Image]
+    BUILD --> TAG[Tag Image with Git SHA]
+    TAG --> GHCR[Push to GitHub Container Registry]
+    GHCR --> DEPLOY_STAGE[Auto-Deploy to Staging VM]
+    DEPLOY_STAGE --> SMOKE_STAGE[Run Smoke & E2E on Staging]
+
+    SMOKE_STAGE --> PROD_GATE{Manual Approval Gate}
+    PROD_GATE -- Approved --> BACKUP_PROD[Automated Pre-deploy pg_dump Backup]
+    BACKUP_PROD --> MIGRATE_PROD[Apply Expand Migrations]
+    MIGRATE_PROD --> DEPLOY_PROD[Update Image Tag & Restart Containers]
+    DEPLOY_PROD --> HEALTH_GATE{/health/ready == 200 within 60s?}
+    HEALTH_GATE -- Yes --> SMOKE_PROD[Run Production Smoke Tests]
+    HEALTH_GATE -- No --> AUTO_ROLLBACK[Automatic Rollback to Previous Image Tag]
+    SMOKE_PROD -- Failed --> AUTO_ROLLBACK
+    SMOKE_PROD -- Passed --> SUCCESS[Deploy Complete & Telegram Notification]
+```
+
+### 8.2 Production Deployment Safety Controls
+
+1. **Pre-Deploy Database Snapshot:** Before executing migrations or swapping container images, a timestamped snapshot is dumped to the local backup directory and synchronized to Cloudflare R2 (`linkme-backups/pre-deploy/pre-deploy-$SHA.sql.gz`).
+2. **Health-Check Gate:** The deployment runner polls `https://linkme.cv/health/ready` for up to 60 seconds (10 attempts every 6s). If the endpoint fails to return HTTP 200 with `database: "connected"`, the deployment is aborted.
+3. **Automatic Rollback:** On health check failure or post-deploy smoke test failure, the deployment script executes an immediate rollback:
+   ```bash
+   # Re-points the image tag to PREVIOUS_SHA and restarts containers
+   IMAGE_TAG=$PREVIOUS_SHA docker compose -f docker-compose.prod.yml up -d --remove-orphans
+   ```
+4. **One-Command Manual Rollback:**
+   ```bash
+   ./scripts/rollback.sh <TARGET_COMMIT_SHA>
+   ```
+
+### 8.3 CI Minute Budget & Caching Optimization
+
+GitHub Actions provides **2,000 free Linux minutes/month** for public/private repositories.
+To guarantee LINKME operates comfortably within the free tier (< 600 minutes/month):
+
+1. **Dependency Caching:** `actions/setup-node@v4` with `cache: "npm"` eliminates redundant package downloads (saves ~2 minutes per run).
+2. **Docker Layer Caching:** Container builds use GitHub Actions cache backend (`cache-from: type=gha`, `cache-to: type=gha,mode=max`) saving ~3 minutes per build.
+3. **Selective Paths Filtering:** Workflows only trigger when relevant application files are modified (documentation changes in `/docs` bypass compute-heavy test suites).
+4. **Target Pipeline Duration:** PR gate completes in $\le 4$ minutes.
+
+---
+
+## 9. Expand/Contract Migration Policy & Disaster Recovery
+
+### 9.1 The Expand/Contract Rule (Zero-Downtime Safe)
+
+Destructive schema changes (`DROP COLUMN`, `DROP TABLE`, `RENAME COLUMN`, `ALTER COLUMN ... NOT NULL`) are **STRICTLY PROHIBITED** in the same deployment as application code changes.
+Migrations must follow a two-phase lifecycle:
+
+1. **Phase 1 (Expand):**
+   - Add new nullable columns or new tables.
+   - Code writes to both old and new columns, but reads from old.
+   - Deploy code and verify stability.
+2. **Phase 2 (Migrate Data & Switch Reads):**
+   - Background worker backfills new columns from old columns.
+   - Code switches to read exclusively from new columns.
+3. **Phase 3 (Contract):**
+   - Remove old unused columns or constraints in a subsequent scheduled release.
+
+### 9.2 Migration Rollback Strategy
+
+Because Drizzle ORM does not generate down migrations automatically:
+
+- Every forward migration `packages/db/drizzle/XXXX_name.sql` is accompanied by an authoritative, verified `packages/db/drizzle/XXXX_name_down.sql` script.
+- Down scripts drop tables/constraints in exact reverse foreign-key order.
+- In case of complex migration failure, disaster recovery falls back to restoring the pre-deployment `pg_dump` snapshot taken in Section 8.2.

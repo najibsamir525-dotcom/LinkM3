@@ -77,27 +77,69 @@ Every single functional requirement traces to its corresponding UI view, API end
 ### Phase 3: AI Pipeline & Async Job Orchestration
 
 - **Deliverables:**
-  - `ai` BullMQ worker: Provider abstraction layer (Gemini 1.5 Pro / Flash), delimited prompt-injection defense wrappers, Zod schema validation.
+  - `ai` pipeline abstraction layer: Provider-agnostic interface supporting three runtime modes: `disabled` (default for MVP), `byok` (Bring Your Own Key), and `paid-users-only` (future). **Notice:** No specific AI vendor/model is named or wired until full legal and commercial data terms (training on user inputs, data retention policies, EU data transfer safeguards) are formally documented and approved. Mode remains strictly `AI_PIPELINE_MODE=disabled`.
+  - Delimited prompt-injection defense wrappers, Zod schema validation for structured outputs.
   - `cv-import`: Document parser worker (`unpdf`, `mammoth`, Tesseract OCR), side-by-side human review screen before committing to Master Profile.
   - `tailor` & `ats-score`: Job description keyword gap analysis, tone/bullet refinement, translation (Arabic <-> English).
   - `credit-ledger`: Quota enforcement, concurrency throttling, cost tracking per user.
 - **Exit Quality Gates:** Prompt injection test suite verifies that adversarial documents cannot leak system prompts or break JSON schemas; rate limits and timeouts verified via integration tests.
 
-### Phase 4: Sharing, Versioning, DOCX Export, Hosted Billing & Admin Panel
+### Phase 4: Sharing, Versioning, DOCX Export & Admin Panel (Free Beta Roadmap)
 
 - **Deliverables:**
   - `share` module: Unlisted expiring slugs, optional Argon2id password protection, QR code generator, read-heavy public caching, privacy-first country view counter (`link_views` partitions).
   - `versions` module: Immutable snapshot history and one-click rollback.
   - `docx-export` worker: Clean semantic DOCX generation.
-  - `billing` module: Hosted checkout (Lemon Squeezy / Paddle), signed webhook handlers with idempotency keys, withdrawal rights automation, one-click cancellation.
+  - `billing` schema status: **FREE BETA ONLY**. Billing tables (`plans`, `subscriptions`, `payments`) remain completely dormant behind `FEATURE_BILLING_ENABLED=false`. No payment gateway or merchant-of-record integration is enabled without explicit prior approval.
   - `admin` portal: Template manager, moderation & account suspension, AI cost limits, GDPR/Law 81 request manager (`data_requests`), tamper-evident audit logs.
-- **Exit Quality Gates:** 100% coverage on billing webhooks and cancellation logic; zero card data touches application memory; audit logs record all administrative actions.
+- **Exit Quality Gates:** 100% test coverage on share link security and version snapshot restoration; zero payment gateway endpoints active; audit logs record all administrative actions.
 
 ### Phase 5: Hardening, Load Testing, Disaster Recovery & Launch Readiness
 
 - **Deliverables:**
   - k6 load tests: 500 concurrent virtual users on public CV links and editor autosave endpoints; stress testing PDF export queue under high concurrency.
   - Security Penetration & SAST Audit: Semgrep, CodeQL, OWASP ZAP automated dynamic scan.
-  - Disaster Recovery Drill: Automated Postgres backup restoration test; simulated data erasure drill (UC-05 cascade).
-  - Production Launch Checklist & Runbooks: Incident response 72-hour notification runbook, DPA agreements, LICENSES registry.
+
+---
+
+## 3. Quality Assurance, Testing Pyramid & Operational Drills
+
+### 3.1 The Testing Pyramid Architecture
+
+```
+         / \
+        /   \      E2E (Playwright: Critical user flows, auth, export, public CV)
+       /-----\
+      /       \    Integration (NestJS API + PostgreSQL + Valkey via Testcontainers)
+     /---------\
+    /           \  Unit Tests (Domain schemas, policies, crypto, validators, calculations)
+   /-------------\
+```
+
+| Layer                   | Technology              | Target Scope                                                                      | Coverage Threshold                               | Execution Frequency        |
+| :---------------------- | :---------------------- | :-------------------------------------------------------------------------------- | :----------------------------------------------- | :------------------------- |
+| **Unit Tests**          | Vitest                  | Domain logic, Zod validation, encryption, authorization, calculations             | 100% on Auth/Security/Crypto, $\ge 80\%$ overall | Every commit & PR          |
+| **Integration Tests**   | Vitest + Testcontainers | API endpoints, DB transactions, anti-IDOR isolation, cascade deletions            | 100% negative auth tests                         | Every PR & pre-merge       |
+| **E2E Tests**           | Playwright              | Full browser user journeys (signup $\rightarrow$ editor $\rightarrow$ PDF export) | Critical path coverage                           | PR merge to main & Nightly |
+| **Accessibility Tests** | `@axe-core/playwright`  | WCAG 2.2 AA compliance across LTR & RTL layouts                                   | 100% violation-free                              | Every PR modifying UI      |
+
+### 3.2 Specialized Verification Suites
+
+1. **Arabic / Bilingual / Multi-Page PDF Regression Suite:**
+   - Playwright visual regression comparisons verifying Arabic font ligatures (Amiri, Noto Sans Arabic), bidirectional text ordering, correct page-break preservation, and selectable vector text output.
+2. **RTL Accessibility Suite:**
+   - Verifies keyboard tab navigation order (`Tab` moves right-to-left in RTL mode), focus rings, and screen-reader landmark announcements.
+3. **Log & Error PII/Secret Scrubbing Suite:**
+   - Automated test suite asserting that Pino log streams, HTTP 4xx/5xx error responses, and Sentry event payloads never contain passwords, tokens, encryption keys, raw IP addresses, or unencrypted PII.
+4. **Nightly Full E2E Schedule:**
+   - Scheduled GitHub Actions cron job (`0 2 * * *`) executing the complete Playwright suite against the staging environment.
+5. **Monthly Scripted Backup-Restore Drill:**
+   - Executed on the first Monday of each month: automated script pulls latest R2 backup snapshot, decrypts GPG envelope, restores to an isolated test container, and executes verification queries. Results logged in `/docs/runbooks/drill-log.md`.
+6. **Pre-Launch k6 Load & Stress Testing:**
+   - Simulates 500 concurrent virtual users on public CV links and autosave endpoints; benchmarks PDF queue throughput under saturation. Results and latency percentiles (p95, p99) committed to `/docs/benchmarks/`.
+7. **Strict Bug Fix Regression Policy:**
+   - No bug fix PR may be approved without an accompanying failing regression test proving the defect is resolved and cannot reoccur.
+
+- Disaster Recovery Drill: Automated Postgres backup restoration test; simulated data erasure drill (UC-05 cascade).
+- Production Launch Checklist & Runbooks: Incident response 72-hour notification runbook, DPA agreements, LICENSES registry.
 - **Exit Quality Gates:** P95 latency < 150ms on public CVs; zero high/critical vulnerabilities; backup restore verified with data integrity checksums.

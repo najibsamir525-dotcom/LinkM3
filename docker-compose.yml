@@ -1,0 +1,122 @@
+# =============================================================================
+# LINKME Platform - Local Development Stack
+# =============================================================================
+# Usage:
+#   docker compose up -d          # Start Postgres 16 + Valkey 7.2
+#   docker compose down           # Stop containers (data persisted in volumes)
+#   docker compose down -v        # Stop and DELETE all data volumes
+#   docker compose logs -f        # Follow logs
+#
+# SECURITY NOTICE:
+#   These credentials are for LOCAL DEVELOPMENT ONLY.
+#   Production uses separate secrets per ENCRYPTION_KEY_MANAGEMENT.md.
+# =============================================================================
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: linkme-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: linkme_db
+      POSTGRES_USER: linkme_user
+      POSTGRES_PASSWORD: linkme_secret_pass
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+    networks:
+      - data-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U linkme_user -d linkme_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    # Resource limits for free-tier VMs (Oracle Always Free: 1 OCPU, 1 GB RAM)
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  valkey:
+    image: valkey/valkey:7.2-alpine
+    container_name: linkme-valkey
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - valkeydata:/data
+    networks:
+      - data-net
+    command: >
+      valkey-server
+      --maxmemory 128mb
+      --maxmemory-policy allkeys-lru
+      --save 60 1000
+      --loglevel warning
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    deploy:
+      resources:
+        limits:
+          memory: 192M
+
+  # Local S3-compatible storage for development (replaces Cloudflare R2)
+  minio:
+    image: minio/minio:latest
+    container_name: linkme-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: linkme_minio_access
+      MINIO_ROOT_PASSWORD: linkme_minio_secret_key_min_8
+    ports:
+      - "9000:9000"     # S3 API
+      - "9001:9001"     # MinIO Console
+    volumes:
+      - miniodata:/data
+    networks:
+      - data-net
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+
+  # Local SMTP server for email verification testing
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: linkme-mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025"    # SMTP
+      - "8025:8025"    # Web UI
+    networks:
+      - data-net
+    deploy:
+      resources:
+        limits:
+          memory: 64M
+
+volumes:
+  pgdata:
+    driver: local
+  valkeydata:
+    driver: local
+  miniodata:
+    driver: local
+
+networks:
+  data-net:
+    driver: bridge

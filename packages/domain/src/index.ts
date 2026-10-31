@@ -7,3 +7,4 @@ export * from "./profile/profile.schema.js";
 export * from "./profile/custom-section.validator.js";
 export * from "./storage/upload.validator.js";
 export * from "./security/authorization.policy.js";
+export * from "./privacy/erasure.types.js";

@@ -45,3 +45,12 @@ All fonts, icons, libraries, and assets utilized in the LINKME platform are stri
 | **In-Memory Store** | Valkey 7.2+ | BSD-3-Clause | Full commercial rights (community fork of Redis) |
 
 *\*Note on Redis: Redis 7.2.x dual-license changes apply to cloud providers selling managed Redis services. Self-hosting Redis internally as a cache/queue behind our proprietary API complies with license terms; alternatively, Dragonfly or KeyDB (BSD/MIT) or Valkey (BSD-3-Clause) can be dropped in with zero code changes.*
+
+---
+
+## 4. Development-Only Tooling (Excluded from Production Images & Shipped Artifacts)
+
+| Tool | Purpose | License | Production Exclusion Guarantee |
+| :--- | :--- | :--- | :--- |
+| **MinIO** | Local offline S3 emulation (`docker-compose.yml`) | AGPL-3.0 | **STRICTLY EXCLUDED** from all production builds, container images, and runtime artifacts. The application code uses `@aws-sdk/client-s3` (Apache-2.0) interacting over standard HTTPS/S3 API. In staging/production, the object storage target is Cloudflare R2 (or any commercial S3-compatible service). No MinIO binary, library, or container is ever shipped or executed in production. |
+
