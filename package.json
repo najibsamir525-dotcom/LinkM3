@@ -1,0 +1,28 @@
+{
+  "name": "linkme",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Production-grade, privacy-first, RTL-native CV/resume builder",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build": "npm run --workspaces --if-present build",
+    "test": "npm run --workspaces --if-present test",
+    "lint": "npm run --workspaces --if-present lint",
+    "typecheck": "npm run --workspaces --if-present typecheck",
+    "format": "prettier --write \"**/*.{ts,tsx,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,json,md}\"",
+    "audit:deps": "npm audit --audit-level=high"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "prettier": "^3.4.2",
+    "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=10.0.0"
+  }
+}

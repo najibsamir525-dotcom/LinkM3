@@ -1,0 +1,47 @@
+# Commercial Open-Source License Registry
+
+All fonts, icons, libraries, and assets utilized in the LINKME platform are strictly vetted for commercial use under permissive open-source licenses (MIT, Apache 2.0, ISC, SIL Open Font License 1.1). No Copyleft (GPL / AGPL) code or assets are included in the shipped product.
+
+---
+
+## 1. Typography & Web Fonts
+
+| Font Family | Usage | License | Commercial Use Permitted? | License Source / Upstream |
+| :--- | :--- | :--- | :--- | :--- |
+| **Noto Sans Arabic** | Primary Arabic UI & PDF typography | SIL Open Font License 1.1 | **YES** | Google Fonts / Noto Project |
+| **Amiri** | Classic Arabic serif CV templates | SIL Open Font License 1.1 | **YES** | Khaled Hosny / Google Fonts |
+| **Inter** | Modern Latin clean sans typography | SIL Open Font License 1.1 | **YES** | Rasmus Andersson |
+| **Roboto** | Standard Latin ATS-optimized typography | Apache License 2.0 | **YES** | Christian Robertson / Google |
+
+---
+
+## 2. Icons & UI Asset Libraries
+
+| Library | Purpose | License | Commercial Use Permitted? |
+| :--- | :--- | :--- | :--- |
+| **Lucide React** | Application & template iconography | ISC License | **YES** |
+| **Radix UI Primitives**| Accessible, unstyled UI primitives | MIT License | **YES** |
+
+---
+
+## 3. Core Software Dependencies
+
+| Component | Package / Tool | License | Commercial Viability |
+| :--- | :--- | :--- | :--- |
+| **Frontend Framework** | Next.js (React 19) | MIT License | Full commercial rights |
+| **Backend Framework** | NestJS | MIT License | Full commercial rights |
+| **Database ORM** | Drizzle ORM | Apache License 2.0 | Full commercial rights |
+| **Authentication** | Better Auth | Apache License 2.0 | Full commercial rights |
+| **Styling** | Tailwind CSS | MIT License | Full commercial rights |
+| **Drag & Drop** | dnd-kit | MIT License | Full commercial rights |
+| **Rich Text Editor** | Tiptap (Core) | MIT License | Full commercial rights |
+| **Validation** | Zod | MIT License | Full commercial rights |
+| **Queue Management** | BullMQ | MIT License | Full commercial rights |
+| **Browser Engine** | Playwright (Chromium) | Apache License 2.0 | Full commercial rights |
+| **Logging** | Pino | MIT License | Full commercial rights |
+| **Document Parsers** | unpdf, mammoth | MIT / BSD-2-Clause | Full commercial rights |
+| **Image Processing** | Sharp | Apache License 2.0 | Full commercial rights |
+| **Database Engine** | PostgreSQL 16 | PostgreSQL License | Full commercial rights |
+| **In-Memory Store** | Valkey 7.2+ | BSD-3-Clause | Full commercial rights (community fork of Redis) |
+
+*\*Note on Redis: Redis 7.2.x dual-license changes apply to cloud providers selling managed Redis services. Self-hosting Redis internally as a cache/queue behind our proprietary API complies with license terms; alternatively, Dragonfly or KeyDB (BSD/MIT) or Valkey (BSD-3-Clause) can be dropped in with zero code changes.*
