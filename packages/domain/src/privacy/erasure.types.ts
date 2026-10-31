@@ -83,7 +83,8 @@ export class AccountErasureOrchestrator {
     let storageObjectsPurged = 0;
     if (assetKeys.length > 0) {
       try {
-        storageObjectsPurged = await this.storageAdapter.deleteObjects(assetKeys);
+        storageObjectsPurged =
+          await this.storageAdapter.deleteObjects(assetKeys);
       } catch (err: unknown) {
         errors.push(`Storage purge failed: ${(err as Error).message}`);
       }

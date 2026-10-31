@@ -254,7 +254,9 @@ describe("Account Erasure Service — Real PostgreSQL 16 Integration", () => {
 
     expect(partialReport.status).toBe("PARTIAL_FAILURE");
     expect(partialReport.errors).toBeDefined();
-    expect(partialReport.errors![0]).toContain("Storage purge failed: S3 500 Internal Error");
+    expect(partialReport.errors![0]).toContain(
+      "Storage purge failed: S3 500 Internal Error",
+    );
 
     // Restore original deleteObjects and retry
     erasureService.deleteObjects = originalDelete;

@@ -97,9 +97,7 @@ describe("AccountErasureOrchestrator", () => {
 
   it("handles partial failure gracefully when storage purge throws, returning PARTIAL_FAILURE", async () => {
     const mockDbAdapter: DatabasePurgeAdapter = {
-      getUserAssetStorageKeys: vi
-        .fn()
-        .mockResolvedValue(["assets/avatar.jpg"]),
+      getUserAssetStorageKeys: vi.fn().mockResolvedValue(["assets/avatar.jpg"]),
       purgeUserCascading: vi.fn().mockResolvedValue({
         tableCounts: [{ tableName: "users", rowsDeleted: 1 }],
         auditLogsAnonymized: 1,
@@ -108,7 +106,9 @@ describe("AccountErasureOrchestrator", () => {
     };
 
     const mockStorageAdapter: StoragePurgeAdapter = {
-      deleteObjects: vi.fn().mockRejectedValue(new Error("S3 503 Service Unavailable")),
+      deleteObjects: vi
+        .fn()
+        .mockRejectedValue(new Error("S3 503 Service Unavailable")),
     };
 
     const mockCacheAdapter: CacheSessionPurgeAdapter = {
@@ -125,7 +125,9 @@ describe("AccountErasureOrchestrator", () => {
 
     expect(report.status).toBe("PARTIAL_FAILURE");
     expect(report.errors).toBeDefined();
-    expect(report.errors![0]).toContain("Storage purge failed: S3 503 Service Unavailable");
+    expect(report.errors![0]).toContain(
+      "Storage purge failed: S3 503 Service Unavailable",
+    );
     expect(report.sessionsInvalidated).toBe(1);
     expect(report.dbRecordsPurged).toHaveLength(1);
   });
@@ -133,7 +135,9 @@ describe("AccountErasureOrchestrator", () => {
   it("handles partial failure when database cascade throws, capturing error in report", async () => {
     const mockDbAdapter: DatabasePurgeAdapter = {
       getUserAssetStorageKeys: vi.fn().mockResolvedValue([]),
-      purgeUserCascading: vi.fn().mockRejectedValue(new Error("Database deadlock")),
+      purgeUserCascading: vi
+        .fn()
+        .mockRejectedValue(new Error("Database deadlock")),
     };
 
     const mockStorageAdapter: StoragePurgeAdapter = {
@@ -154,13 +158,17 @@ describe("AccountErasureOrchestrator", () => {
 
     expect(report.status).toBe("PARTIAL_FAILURE");
     expect(report.errors).toBeDefined();
-    expect(report.errors![0]).toContain("Database cascade purge failed: Database deadlock");
+    expect(report.errors![0]).toContain(
+      "Database cascade purge failed: Database deadlock",
+    );
     expect(report.sessionsInvalidated).toBe(2);
   });
 
   it("handles partial failure when session cache invalidation throws, capturing error in report", async () => {
     const mockDbAdapter: DatabasePurgeAdapter = {
-      getUserAssetStorageKeys: vi.fn().mockRejectedValue(new Error("Connection reset")),
+      getUserAssetStorageKeys: vi
+        .fn()
+        .mockRejectedValue(new Error("Connection reset")),
       purgeUserCascading: vi.fn().mockResolvedValue({
         tableCounts: [{ tableName: "users", rowsDeleted: 1 }],
         auditLogsAnonymized: 0,
@@ -173,7 +181,9 @@ describe("AccountErasureOrchestrator", () => {
     };
 
     const mockCacheAdapter: CacheSessionPurgeAdapter = {
-      invalidateUserSessions: vi.fn().mockRejectedValue(new Error("Valkey timeout")),
+      invalidateUserSessions: vi
+        .fn()
+        .mockRejectedValue(new Error("Valkey timeout")),
     };
 
     const orchestrator = new AccountErasureOrchestrator(
